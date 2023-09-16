@@ -1,0 +1,119 @@
+
+
+
+/*1. Which product has the highest price? Only return a single row.
+2. Which customer has made the most orders?
+3. What’s the total revenue per product?
+4. Find the day with the highest revenue.
+5. Find the first order (by date) for each customer.
+6. Find the top 3 customers who have ordered the most distinct products
+7. Which product has been bought the least in terms of quantity?
+8. What is the median order total?
+9. For each order, determine if it was ‘Expensive’ (total over 300), ‘Affordable’ (total over 100), or ‘Cheap’.
+10. Find customers who have ordered the product with the highest price.*/
+
+-- 1. Which product has the highest price? Only return a single row.
+
+   select product_name,price
+   from products
+   order by price desc
+   limit 1;
+   
+-- 2. Which customer has made the most orders?
+
+  -- with cte as (
+ --  select c.customer_id,count(*) as TotalOrders
+ --  from customers c inner join orders o using(customer_id)
+  -- group by 1)
+   
+ --  select cte.customer_id,concat(c.first_name," ",c.last_name) as CustomerName,cte.TotalOrders
+  -- from cte
+  -- inner join customers c using(customer_id)
+   --where TotalOrders in (select max(TotalOrders) from cte);
+   
+  -- select c.customer_id,count(*) as TotalOrders
+  -- from customers c inner join orders o using(customer_id)
+   --group by 1
+  -- having Totalorders>1;
+   
+-- 3. What’s the total revenue per product?
+
+   select p.product_id,p.product_name,sum(p.price*oi.quantity) as TotalRevenue
+   from products p inner join order_items oi using(product_id)
+   group by p.product_id,p.product_name
+   order by TotalRevenue desc;
+   
+-- 4. Find the day with the highest revenue.
+
+   select dayname(order_date) as DayofWeek,o.order_date,sum(oi.quantity*p.price) as Revenue
+   from order_items oi inner join orders o using(order_id)
+   inner join products p using(product_id)
+   group by 2
+   order by Revenue desc
+   limit 1;
+   
+-- 5. Find the first order (by date) for each customer.
+
+   select concat(c.first_name," ",c.last_name) as CustomerName,Min(o.order_date) as First_Order
+   from orders o inner join order_items oi using(order_id)
+   inner join customers c using(customer_id)
+   group by c.customer_id;
+   
+-- 6. Find the top 3 customers who have ordered the most distinct products
+
+   select concat(c.first_name," ",c.last_name) as CustomerName, count(distinct product_id) as TotalDistinctProducts
+   from customers c inner join orders o using(customer_id)
+   inner join order_items oi using(order_id)
+   group by 1
+   order by 2 desc
+   limit 3;
+   
+-- 7. Which product has been bought the least in terms of quantity?
+
+    with lb as (
+    select p.product_id, p.product_name, sum(oi.quantity) as TotalQuantity,
+    dense_rank() over (order by sum(oi.quantity) asc) as rnk
+    from order_items oi inner join products p using(product_id)
+    group by 1,2
+    )
+    
+    select product_id,product_name,TotalQuantity
+    from lb
+    where rnk=1;
+   
+-- 8. What is the median order total?
+
+    with TotalOrders as
+    (
+    select o.order_id,SUM(oi.quantity*p.price) as TotalRevenue
+    from order_items oi inner join products p using(product_id)
+    inner join orders o using(order_id)
+    group by o.order_id)
+    select avg(totalrevenue) as median_order_total
+    from ( select totalrevenue, Ntile(2) over (partition by totalrevenue) as quartile
+    from totalorders) median_query where quartile =1 or quartile=2;
+
+
+-- 9. For each order, determine if it was ‘Expensive’ (total over 300), ‘Affordable’ (total over 100), or ‘Cheap’.
+
+	with cte as (
+    select oi.order_id, sum(oi.quantity*p.price) as Total
+    from order_items oi inner join products p using(product_id)
+    group by 1
+    order by 2)
+    
+    select order_id,Total,
+    case when Total>300 then 'Expensive'
+    when Total<300 and Total>100 then 'Affordable'
+    else 'cheap'
+    end as Order_status
+    from cte;
+    
+-- 10. Find customers who have ordered the product with the highest price.
+
+    select product_name, max(price) as Max
+    from products
+    group by 1
+    order by 2 desc
+    limit 1;
+    
